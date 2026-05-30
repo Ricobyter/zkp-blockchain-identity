@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #000000;
+  color: #d4d4d8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #000000;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[1.75rem] border border-white/10 bg-zinc-900/85 p-5 shadow-glow backdrop-blur-xl sm:p-6;
+  }
+
+  .panel-soft {
+    @apply rounded-[1.75rem] border border-white/10 bg-zinc-800/60 p-5 shadow-glow backdrop-blur-xl sm:p-6;
+  }
+
+  .field-label {
+    @apply mb-2 block text-sm font-medium text-slate-300;
+  }
+
+  .field-input {
+    @apply w-full rounded-2xl border border-white/10 bg-zinc-800/70 px-4 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-400 focus:bg-zinc-700/70;
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center rounded-2xl bg-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center rounded-2xl border border-white/10 bg-zinc-800/70 px-5 py-3 text-sm font-semibold text-zinc-100 transition hover:border-white/20 hover:bg-zinc-700/70;
+  }
+
+  .nav-link {
+    @apply rounded-2xl px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white;
+  }
+
+  .nav-link-active {
+    @apply bg-white/10 text-zinc-100;
+  }
+}

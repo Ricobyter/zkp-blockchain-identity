@@ -1,0 +1,108 @@
+import { formatDate, truncate } from "../utils/format.js";
+
+export default function StudentsTable({ students, loading, onRefresh, selectedIds, onToggleSelect, onToggleSelectAll, onSendSelected }) {
+  const allSelected = students.length > 0 && selectedIds.length === students.length;
+  const someSelected = selectedIds.length > 0 && selectedIds.length < students.length;
+
+  if (loading) {
+    return (
+      <div className="panel grid gap-4">
+        <div className="h-6 w-40 animate-pulse rounded-full bg-white/10" />
+        <div className="grid gap-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-16 animate-pulse rounded-2xl bg-white/5" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!students.length) {
+    return (
+      <div className="panel flex flex-col items-start gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">No students yet</h3>
+          <p className="mt-2 text-sm text-slate-400">Add a student manually or upload an Excel sheet to populate the dashboard.</p>
+        </div>
+        <button className="secondary-button" type="button" onClick={onRefresh}>
+          Refresh list
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel overflow-hidden">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Students</h2>
+          <p className="mt-1 text-sm text-slate-400">Select students below, then send credentials from the dashboard.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="secondary-button" type="button" onClick={onRefresh}>
+            Refresh
+          </button>
+          <button className="primary-button" type="button" onClick={onSendSelected} disabled={!selectedIds.length}>
+            Send Email to Selected
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-y-3 text-left">
+          <thead>
+            <tr className="text-xs uppercase tracking-[0.25em] text-slate-500">
+              <th className="px-4 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all students"
+                  checked={allSelected}
+                  ref={(input) => {
+                    if (input) {
+                      input.indeterminate = someSelected;
+                    }
+                  }}
+                  onChange={onToggleSelectAll}
+                />
+              </th>
+              <th className="px-4 py-2">Name</th>
+              <th className="px-4 py-2">Email</th>
+              <th className="px-4 py-2">Roll No</th>
+              <th className="px-4 py-2">Programme</th>
+              <th className="px-4 py-2">Contact</th>
+              <th className="px-4 py-2">Email Status</th>
+              <th className="px-4 py-2">Hash</th>
+              <th className="px-4 py-2">Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((student) => (
+              <tr key={student.id} className="rounded-2xl bg-white/5 text-sm text-slate-200">
+                <td className="rounded-l-2xl px-4 py-4 align-middle">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${student.name}`}
+                    checked={selectedIds.includes(student.id)}
+                    onChange={() => onToggleSelect(student.id)}
+                  />
+                </td>
+                <td className="px-4 py-4 font-medium text-white">{student.name}</td>
+                <td className="px-4 py-4">{student.email}</td>
+                <td className="px-4 py-4">{student.rollNo}</td>
+                <td className="px-4 py-4">{student.programme}</td>
+                <td className="px-4 py-4">{student.contactNo}</td>
+                <td className="px-4 py-4">
+                  <span className={student.emailSent ? "rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-medium text-emerald-200" : "rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200"}>
+                    {student.emailSent ? `Sent${student.emailSentAt ? ` • ${formatDate(student.emailSentAt)}` : ""}` : "Pending"}
+                  </span>
+                </td>
+                <td className="px-4 py-4 font-mono text-xs text-zinc-300">{truncate(student.hashedData, 22)}</td>
+                <td className="rounded-r-2xl px-4 py-4 text-slate-400">{formatDate(student.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
