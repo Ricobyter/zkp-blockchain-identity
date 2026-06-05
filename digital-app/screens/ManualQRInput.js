@@ -13,6 +13,13 @@ export default function ManualQRInput({ navigation }) {
   const [qrData, setQrData] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const handleGoToDashboard = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'HomeScreen' }],
+    });
+  };
+
   const handleProcessQR = () => {
     if (!qrData.trim()) {
       Alert.alert('Error', 'Please enter QR code data');
@@ -116,11 +123,11 @@ export default function ManualQRInput({ navigation }) {
           <Text style={styles.exampleButtonText}>📝 Paste Example</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleGoToDashboard}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>🏠 Back to Dashboard</Text>
         </TouchableOpacity>
       </View>
 
