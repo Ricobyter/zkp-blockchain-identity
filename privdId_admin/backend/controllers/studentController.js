@@ -234,6 +234,13 @@ export const loginStudent = asyncHandler(async (req, res) => {
   });
 });
 
+export const getStudentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const student = await Student.findById(id);
+  if (!student) throw new AppError("Student not found.", 404);
+  res.json({ status: "success", student: sanitizeStudent(student) });
+});
+
 export const updateStudentById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const result = await updateStudent(id, req.body);

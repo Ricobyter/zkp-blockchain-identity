@@ -1,6 +1,6 @@
 import express from "express";
 
-import { addStudent, bulkAddStudents, getStudents, loginStudent, sendStudentEmails, updateStudentById, revokeStudentById, uploadMiddleware, uploadStudents } from "../controllers/studentController.js";
+import { addStudent, bulkAddStudents, getStudents, getStudentById, loginStudent, sendStudentEmails, updateStudentById, revokeStudentById, uploadMiddleware, uploadStudents } from "../controllers/studentController.js";
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ router.post("/", addStudent);
 router.post("/bulk", bulkAddStudents);
 router.post("/upload", uploadMiddleware, uploadStudents);
 router.post("/send-email", sendStudentEmails);
+router.get("/:id", getStudentById);
 router.put("/:id", updateStudentById);
 router.delete("/:id", revokeStudentById);
 
