@@ -5,23 +5,20 @@ contract CredentialRegistry {
     address public admin;
 
     struct Credential {
+        string  rollNo;
         string  ipfsCID;
         bytes32 pubHash;
         uint256 issuedAt;
         bool    exists;
+        bool    revoked;
     }
 
-    // rollNo (string) => credential record
-    mapping(string => Credential) private credentials;
-    // pubHash => valid (for fast ZK proof cross-check)
-    mapping(bytes32 => bool) public isValidHash;
+    mapping(string  => Credential) private credentialsByRollNo;
+    mapping(bytes32 => string)     public  rollNoByHash;
+    mapping(bytes32 => bool)       public  isValidHash;
 
-    event CredentialIssued(
-        string  indexed rollNo,
-        string          ipfsCID,
-        bytes32         pubHash,
-        uint256         timestamp
-    );
+    event CredentialIssued(string indexed rollNo, string ipfsCID, bytes32 pubHash, uint256 timestamp);
+    event CredentialRevoked(string indexed rollNo, bytes32 pubHash, uint256 timestamp);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not authorized");
@@ -37,9 +34,29 @@ contract CredentialRegistry {
         string  calldata ipfsCID,
         bytes32          pubHash
     ) external onlyAdmin {
-        credentials[rollNo] = Credential(ipfsCID, pubHash, block.timestamp, true);
-        isValidHash[pubHash] = true;
+        // If re-issuing (student update), invalidate the old hash
+        Credential storage existing = credentialsByRollNo[rollNo];
+        if (existing.exists && existing.pubHash != bytes32(0)) {
+            isValidHash[existing.pubHash] = false;
+            delete rollNoByHash[existing.pubHash];
+        }
+
+        credentialsByRollNo[rollNo] = Credential(rollNo, ipfsCID, pubHash, block.timestamp, true, false);
+        rollNoByHash[pubHash]       = rollNo;
+        isValidHash[pubHash]        = true;
+
         emit CredentialIssued(rollNo, ipfsCID, pubHash, block.timestamp);
+    }
+
+    function revokeCredential(string calldata rollNo) external onlyAdmin {
+        Credential storage cred = credentialsByRollNo[rollNo];
+        require(cred.exists,   "Credential not found");
+        require(!cred.revoked, "Already revoked");
+
+        cred.revoked              = true;
+        isValidHash[cred.pubHash] = false;
+
+        emit CredentialRevoked(rollNo, cred.pubHash, block.timestamp);
     }
 
     function getCredential(string calldata rollNo)
@@ -48,10 +65,26 @@ contract CredentialRegistry {
             string  memory ipfsCID,
             bytes32        pubHash,
             uint256        issuedAt,
-            bool           exists
+            bool           exists,
+            bool           revoked
         )
     {
-        Credential memory c = credentials[rollNo];
-        return (c.ipfsCID, c.pubHash, c.issuedAt, c.exists);
+        Credential memory c = credentialsByRollNo[rollNo];
+        return (c.ipfsCID, c.pubHash, c.issuedAt, c.exists, c.revoked);
+    }
+
+    function getCredentialByHash(bytes32 pubHash)
+        external view
+        returns (
+            string  memory rollNo,
+            string  memory ipfsCID,
+            uint256        issuedAt,
+            bool           exists,
+            bool           revoked
+        )
+    {
+        string memory rNo = rollNoByHash[pubHash];
+        Credential memory c = credentialsByRollNo[rNo];
+        return (rNo, c.ipfsCID, c.issuedAt, c.exists, c.revoked);
     }
 }
