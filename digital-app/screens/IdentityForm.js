@@ -31,6 +31,13 @@ export default function IdentityForm({ onSubmit, navigation }) {
 
   const branches = ['CSE', 'ECE', 'ME', 'SM', 'Design'];
 
+  const handleGoToDashboard = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'HomeScreen' }],
+    });
+  };
+
   // Validate form whenever it changes
   useEffect(() => {
     validateForm();
@@ -279,6 +286,13 @@ export default function IdentityForm({ onSubmit, navigation }) {
               <Text style={styles.manualButtonText}>📝 Manual Input</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.dashboardButton}
+            onPress={handleGoToDashboard}
+          >
+            <Text style={styles.dashboardButtonText}>🏠 Back to Dashboard</Text>
+          </TouchableOpacity>
         </View>
         
         <View style={styles.inputContainer}>
@@ -464,6 +478,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  dashboardButton: {
+    marginTop: 12,
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    width: '100%',
+  },
+  dashboardButtonText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
   },
   inputContainer: {
     marginBottom: 24,

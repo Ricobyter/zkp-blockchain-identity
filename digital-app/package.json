@@ -31,7 +31,8 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-snarkjs": "^0.0.4",
-    "snarkjs": "^0.7.5"
+    "snarkjs": "^0.7.5",
+    "expo-document-picker": "~13.1.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
