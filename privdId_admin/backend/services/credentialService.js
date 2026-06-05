@@ -45,6 +45,18 @@ async function anchorOnChain(rollNo, cid, hashedData) {
   return { txHash: tx.hash, blockNumber: receipt.blockNumber };
 }
 
+export async function revokeCredentialOnChain(rollNo) {
+  const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
+  const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
+  const registry = new ethers.Contract(process.env.REGISTRY_ADDRESS, registryArtifact.abi, wallet);
+
+  const tx = await registry.revokeCredential(rollNo);
+  const receipt = await tx.wait();
+
+  console.log(`[credential] Revoked ${rollNo} | Tx: ${tx.hash}`);
+  return { txHash: tx.hash, blockNumber: receipt.blockNumber };
+}
+
 export async function issueCredentialOnChain(student) {
   const credential = {
     rollNo: student.rollNo,

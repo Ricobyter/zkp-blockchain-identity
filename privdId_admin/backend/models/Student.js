@@ -58,6 +58,14 @@ const studentSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    revoked: {
+      type: Boolean,
+      default: false,
+    },
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
