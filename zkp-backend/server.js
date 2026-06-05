@@ -18,13 +18,18 @@ const vKey = JSON.parse(fs.readFileSync(vKeyPath, 'utf8'));
 const verifierAbiPath = process.env.VERIFIER_ABI_PATH || path.join(__dirname, '../zk-proofs/artifacts/contracts/IdentityVerifier.sol/Groth16Verifier.json');
 const verifierAbi = require(verifierAbiPath).abi;
 
-const verifierAddress = process.env.VERIFIER_ADDRESS || '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+const registryAbiPath = process.env.REGISTRY_ABI_PATH || path.join(__dirname, '../zk-proofs/artifacts/contracts/CredentialRegistry.sol/CredentialRegistry.json');
+const registryAbi = require(registryAbiPath).abi;
+
+const verifierAddress = process.env.VERIFIER_ADDRESS || '0x2625C6fDBEDcCD572836FfbFA391D2C25de7ae26';
+const registryAddress = process.env.REGISTRY_ADDRESS || '0xB7a915C78C546A1082CB66bA294fAFee52E4EB07';
+const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/Lmv_xbdd0nSBMkbWSz9kk';
 const port = Number(process.env.PORT || 3001);
 
 const provider = new ethers.JsonRpcProvider(rpcUrl);
 
 const verifierContract = new ethers.Contract(verifierAddress, verifierAbi, provider);
+const registryContract = new ethers.Contract(registryAddress, registryAbi, provider);
 
 app.get('/', (req, res) => {
   res.send('ZKP backend running');
@@ -86,6 +91,36 @@ app.post('/verify-onchain', async (req, res) => {
   } catch (err) {
     console.error('On-chain proof verification failed:', err);
     res.status(500).json({ error: 'On-chain verification failed', details: err.message });
+  }
+});
+
+app.post('/credential-info', async (req, res) => {
+  const { pubHash } = req.body; // decimal string from publicSignals[0]
+
+  if (!pubHash) {
+    return res.status(400).json({ error: 'pubHash is required' });
+  }
+
+  try {
+    const pubHashBytes32 = ethers.zeroPadValue(ethers.toBeHex(BigInt(pubHash)), 32);
+    const [rollNo, ipfsCID, issuedAt, exists, revoked] = await registryContract.getCredentialByHash(pubHashBytes32);
+
+    if (!exists || !ipfsCID) {
+      return res.json({ found: false, message: 'Credential not found in registry' });
+    }
+
+    res.json({
+      found: true,
+      rollNo,
+      ipfsCID,
+      issuedAtMs: Number(issuedAt) * 1000,
+      revoked,
+      ipfsUrl: `https://gateway.pinata.cloud/ipfs/${ipfsCID}`,
+      etherscanUrl: `https://sepolia.etherscan.io/address/${registryAddress}`,
+    });
+  } catch (err) {
+    console.error('Credential info lookup failed:', err);
+    res.status(500).json({ error: 'Registry lookup failed', details: err.message });
   }
 });
 
