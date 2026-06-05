@@ -46,6 +46,26 @@ const studentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    ipfsCID: {
+      type: String,
+      default: null,
+    },
+    onChainTxHash: {
+      type: String,
+      default: null,
+    },
+    onChainBlock: {
+      type: Number,
+      default: null,
+    },
+    revoked: {
+      type: Boolean,
+      default: false,
+    },
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

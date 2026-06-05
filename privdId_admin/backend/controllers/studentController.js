@@ -13,6 +13,8 @@ import {
   normalizeStudentInput,
   sanitizeStudent,
   sendEmailsForStudents,
+  updateStudent,
+  revokeStudent,
 } from "../services/studentService.js";
 import Student from "../models/Student.js";
 import Joi from "joi";
@@ -47,6 +49,19 @@ function validateExcelRows(rows) {
 const sendEmailSchema = Joi.object({
   studentIds: Joi.array().items(Joi.string().trim().required()).min(1).required(),
 });
+
+const bulkStudentsSchema = Joi.array()
+  .items(
+    Joi.object({
+      name: Joi.string().trim().min(2).max(120).required(),
+      email: Joi.string().trim().email().required(),
+      rollNo: Joi.string().trim().min(1).max(50).required(),
+      programme: Joi.string().trim().min(2).max(120).required(),
+      contactNo: Joi.string().trim().min(5).max(20).required(),
+    })
+  )
+  .min(1)
+  .required();
 
 export const uploadMiddleware = upload.single("file");
 
@@ -144,6 +159,58 @@ export const uploadStudents = asyncHandler(async (req, res) => {
   });
 });
 
+export const bulkAddStudents = asyncHandler(async (req, res) => {
+  const { error, value: rows } = bulkStudentsSchema.validate(req.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (error) {
+    throw new AppError("Validation failed", 400, error.details);
+  }
+
+  const normalizedRows = rows.map(normalizeStudentInput);
+
+  // Check for duplicates within the submitted list
+  const seenEmails = new Set();
+  const seenRollNos = new Set();
+  const internalDuplicates = [];
+
+  normalizedRows.forEach((row) => {
+    if (seenEmails.has(row.email) || seenRollNos.has(row.rollNo)) {
+      internalDuplicates.push({ email: row.email, rollNo: row.rollNo });
+    } else {
+      seenEmails.add(row.email);
+      seenRollNos.add(row.rollNo);
+    }
+  });
+
+  if (internalDuplicates.length) {
+    throw new AppError("Duplicate email or roll number found in submitted list.", 409, internalDuplicates);
+  }
+
+  // Check against existing DB records
+  const databaseMatches = await Student.find({
+    $or: normalizedRows.flatMap((row) => [{ email: row.email }, { rollNo: row.rollNo }]),
+  }).select("email rollNo");
+
+  if (databaseMatches.length) {
+    throw new AppError("Some students already exist in the database.", 409, {
+      duplicates: databaseMatches,
+    });
+  }
+
+  const preparedStudents = await buildBulkStudents(normalizedRows);
+  const result = await insertBulkStudents(preparedStudents);
+
+  res.status(201).json({
+    status: "success",
+    message: `${result.insertedStudents.length} student(s) added successfully.`,
+    count: result.insertedStudents.length,
+    students: result.insertedStudents,
+  });
+});
+
 export const loginStudent = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -157,9 +224,40 @@ export const loginStudent = asyncHandler(async (req, res) => {
     throw new AppError("Invalid email or password.", 401);
   }
 
+  if (student.revoked) {
+    throw new AppError("This credential has been revoked. Please contact your institution.", 403);
+  }
+
   res.json({
     status: "success",
     student: sanitizeStudent(student),
+  });
+});
+
+export const getStudentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const student = await Student.findById(id);
+  if (!student) throw new AppError("Student not found.", 404);
+  res.json({ status: "success", student: sanitizeStudent(student) });
+});
+
+export const updateStudentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await updateStudent(id, req.body);
+  res.json({
+    status: "success",
+    message: "Student updated and credential re-issued on IPFS and blockchain.",
+    student: result.student,
+  });
+});
+
+export const revokeStudentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await revokeStudent(id);
+  res.json({
+    status: "success",
+    message: "Student credential revoked on blockchain.",
+    student: result.student,
   });
 });
 

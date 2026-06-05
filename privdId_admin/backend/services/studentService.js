@@ -3,6 +3,7 @@ import Student from "../models/Student.js";
 import { hashPoseidonFields } from "../utils/poseidonHash.js";
 import { generateTemporaryPassword } from "../utils/password.js";
 import { sendCredentialsEmail } from "./emailService.js";
+import { issueCredentialOnChain, revokeCredentialOnChain } from "./credentialService.js";
 
 export function normalizeStudentInput(studentPayload) {
   return {
@@ -26,6 +27,11 @@ export function sanitizeStudent(student) {
     emailSent: student.emailSent,
     emailSentAt: student.emailSentAt,
     createdAt: student.createdAt,
+    ipfsCID: student.ipfsCID ?? null,
+    onChainTxHash: student.onChainTxHash ?? null,
+    onChainBlock: student.onChainBlock ?? null,
+    revoked: student.revoked ?? false,
+    revokedAt: student.revokedAt ?? null,
   };
 }
 
@@ -72,6 +78,22 @@ export async function createStudent(studentPayload) {
     emailSentAt: null,
   });
 
+  // Anchor credential on IPFS + Sepolia — non-blocking, student is saved regardless
+  try {
+    const { cid, txHash, blockNumber } = await issueCredentialOnChain({
+      rollNo: student.rollNo,
+      programme: student.programme,
+      email: student.email,
+      hashedData: student.hashedData,
+    });
+    student.ipfsCID = cid;
+    student.onChainTxHash = txHash;
+    student.onChainBlock = blockNumber;
+    await student.save();
+  } catch (err) {
+    console.error('[credential] On-chain anchoring failed for', student.rollNo, ':', err.message);
+  }
+
   return {
     student: sanitizeStudent(student),
   };
@@ -96,9 +118,88 @@ export async function insertBulkStudents(preparedStudents) {
   }));
   const insertedStudents = await Student.insertMany(studentsToInsert, { ordered: true });
 
+  // Anchor each credential on IPFS + Sepolia — failures are logged but don't abort
+  for (const student of insertedStudents) {
+    try {
+      const { cid, txHash, blockNumber } = await issueCredentialOnChain({
+        rollNo: student.rollNo,
+        programme: student.programme,
+        email: student.email,
+        hashedData: student.hashedData,
+      });
+      await Student.updateOne(
+        { _id: student._id },
+        { ipfsCID: cid, onChainTxHash: txHash, onChainBlock: blockNumber }
+      );
+    } catch (err) {
+      console.error('[credential] On-chain anchoring failed for', student.rollNo, ':', err.message);
+    }
+  }
+
+  const finalStudents = await Student.find({ _id: { $in: insertedStudents.map((s) => s._id) } });
   return {
-    insertedStudents: insertedStudents.map(sanitizeStudent),
+    insertedStudents: finalStudents.map(sanitizeStudent),
   };
+}
+
+export async function updateStudent(id, payload) {
+  const student = await Student.findById(id);
+  if (!student) throw new AppError("Student not found.", 404);
+  if (student.revoked) throw new AppError("Cannot update a revoked credential.", 400);
+
+  const allowedFields = ["name", "programme", "contactNo"];
+  allowedFields.forEach((field) => {
+    if (payload[field] !== undefined) student[field] = String(payload[field]).trim();
+  });
+
+  // Recompute Poseidon hash with updated fields
+  student.hashedData = await hashPoseidonFields([
+    student.name,
+    student.email,
+    student.rollNo,
+    student.programme,
+    student.contactNo,
+  ]);
+
+  await student.save();
+
+  // Re-issue credential — new IPFS pin + overwrites on-chain CID for this rollNo
+  try {
+    const { cid, txHash, blockNumber } = await issueCredentialOnChain({
+      rollNo: student.rollNo,
+      programme: student.programme,
+      email: student.email,
+      hashedData: student.hashedData,
+    });
+    student.ipfsCID = cid;
+    student.onChainTxHash = txHash;
+    student.onChainBlock = blockNumber;
+    await student.save();
+  } catch (err) {
+    console.error("[credential] Re-anchoring failed for", student.rollNo, ":", err.message);
+  }
+
+  return { student: sanitizeStudent(student) };
+}
+
+export async function revokeStudent(id) {
+  const student = await Student.findById(id);
+  if (!student) throw new AppError("Student not found.", 404);
+  if (student.revoked) throw new AppError("Student credential already revoked.", 400);
+
+  // Revoke on blockchain first
+  try {
+    await revokeCredentialOnChain(student.rollNo);
+  } catch (err) {
+    console.error("[credential] On-chain revocation failed for", student.rollNo, ":", err.message);
+    throw new AppError("On-chain revocation failed: " + err.message, 500);
+  }
+
+  student.revoked = true;
+  student.revokedAt = new Date();
+  await student.save();
+
+  return { student: sanitizeStudent(student) };
 }
 
 export async function sendEmailsForStudents(studentIds) {

@@ -1,22 +1,26 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-circom");
 require("@solarity/hardhat-zkit");
+require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.28",
   circom: {
-    inputBasePath: "./circuits", // Folder where your .circom files are
-    ptau: "../build/pot12_final.ptau", // Path to your ptau file, relative to inputBasePath
+    inputBasePath: "./circuits",
+    ptau: "../build/pot12_final.ptau",
     circuits: [
-      { name: "identity" } // This must match your identity.circom file (without extension)
+      { name: "identity" }
     ]
   },
   networks: {
     hardhat: {},
     localhost: {
       url: "http://127.0.0.1:8545"
+    },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
     }
-    // ...add other networks as needed
   }
 };

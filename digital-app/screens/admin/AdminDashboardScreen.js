@@ -186,7 +186,7 @@ export default function AdminDashboardScreen({ route, navigation }) {
           style={styles.uploadButton}
           onPress={() => navigation.navigate('AdminUpload', { token })}
         >
-          <Text style={styles.uploadButtonText}>📤 Upload Excel</Text>
+          <Text style={styles.uploadButtonText}>📋 Bulk Add</Text>
         </TouchableOpacity>
       </View>
 

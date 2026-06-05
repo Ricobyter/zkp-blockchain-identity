@@ -14,10 +14,11 @@ export default function VerifyProof({ route, navigation }) {
   const { proof, publicSignals, revealedDetails, privacySettings, generatedAt, proofType } = route.params || {};
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [verificationPhase, setVerificationPhase] = useState('ready'); // 'ready', 'offchain', 'blockchain', 'complete'
+  const [verificationPhase, setVerificationPhase] = useState('ready'); // 'ready', 'offchain', 'blockchain', 'registry', 'complete'
   const [verificationResults, setVerificationResults] = useState({
     offchain: null,
-    blockchain: null
+    blockchain: null,
+    registry: null,
   });
 
   if (!proof || !publicSignals) {
@@ -47,19 +48,23 @@ export default function VerifyProof({ route, navigation }) {
       const offchainResult = await verifyOffChain();
       setVerificationResults(prev => ({ ...prev, offchain: offchainResult }));
 
-      // Phase 2: Blockchain Verification
+      // Phase 2: Blockchain Verification (Groth16 on Sepolia)
       setVerificationPhase('blockchain');
       const blockchainResult = await verifyOnChain();
       setVerificationResults(prev => ({ ...prev, blockchain: blockchainResult }));
 
-      // Set final result
+      // Phase 3: Credential Registry Lookup (IPFS + Sepolia registry)
+      setVerificationPhase('registry');
+      const registryResult = await lookupRegistry();
+      setVerificationResults(prev => ({ ...prev, registry: registryResult }));
+
       setVerificationPhase('complete');
-      const finalResult = {
+      setResult({
         offchain: offchainResult,
         blockchain: blockchainResult,
-        overallValid: offchainResult.valid && blockchainResult.valid
-      };
-      setResult(finalResult);
+        registry: registryResult,
+        overallValid: offchainResult.valid && blockchainResult.valid && registryResult.found && !registryResult.revoked,
+      });
 
     } catch (err) {
       setResult({ error: err.message });
@@ -94,17 +99,32 @@ export default function VerifyProof({ route, navigation }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ proof, publicSignals }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Blockchain verification failed: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return {
       valid: data.valid,
       timestamp: new Date().toISOString(),
       method: 'blockchain'
     };
+  };
+
+  const lookupRegistry = async () => {
+    try {
+      const pubHash = publicSignals[0];
+      const response = await fetch(`${BACKEND_URL}/credential-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pubHash }),
+      });
+      if (!response.ok) return { found: false };
+      return await response.json();
+    } catch {
+      return { found: false };
+    }
   };
 
   const handleStartOver = () => {
@@ -217,15 +237,56 @@ export default function VerifyProof({ route, navigation }) {
             <View style={styles.verificationMethod}>
               <Text style={styles.methodIcon}>🔗</Text>
               <View style={styles.methodDetails}>
-                <Text style={styles.methodName}>Blockchain Verification</Text>
+                <Text style={styles.methodName}>Blockchain Verification (Sepolia)</Text>
                 <Text style={[
                   styles.methodStatus,
                   blockchainValid ? styles.blockchainSuccessStatus : styles.errorStatus
                 ]}>
-                  {blockchainValid ? '🔗✅ Verified on-chain' : '❌ Invalid'}
+                  {blockchainValid ? '🔗✅ Groth16 proof verified on-chain' : '❌ Invalid'}
                 </Text>
               </View>
             </View>
+
+            {/* Credential Registry Panel */}
+            {result.registry && (
+              <View style={result.registry.revoked ? styles.revokedPanel : result.registry.found ? styles.registryPanel : styles.registryMissingPanel}>
+                <Text style={styles.registryPanelTitle}>
+                  {result.registry.revoked ? '🚫 Credential Revoked' : result.registry.found ? '📦 Credential Registry' : '⚠️ Not in Registry'}
+                </Text>
+
+                {result.registry.revoked && (
+                  <Text style={styles.revokedText}>
+                    This credential has been revoked by the institution. The proof is cryptographically valid but the credential is no longer active.
+                  </Text>
+                )}
+
+                {result.registry.found && !result.registry.revoked && (
+                  <>
+                    <Text style={styles.registryRow}>
+                      <Text style={styles.registryLabel}>IPFS CID:  </Text>
+                      <Text style={styles.registryValue}>{result.registry.ipfsCID?.slice(0, 20)}...</Text>
+                    </Text>
+                    <Text style={styles.registryRow}>
+                      <Text style={styles.registryLabel}>Issued:  </Text>
+                      <Text style={styles.registryValue}>{new Date(result.registry.issuedAtMs).toLocaleDateString()}</Text>
+                    </Text>
+                    <Text style={styles.registryRow}>
+                      <Text style={styles.registryLabel}>Registry:  </Text>
+                      <Text style={styles.registryValue}>Sepolia Testnet ✓</Text>
+                    </Text>
+                    <Text style={styles.registryNote}>
+                      Credential is permanently anchored on Ethereum. Admin cannot alter or deny issuance.
+                    </Text>
+                  </>
+                )}
+
+                {!result.registry.found && (
+                  <Text style={styles.registryMissingText}>
+                    Credential not found in on-chain registry. The proof may be valid but was not issued through the official PrivdID system.
+                  </Text>
+                )}
+              </View>
+            )}
 
             <View style={styles.trustLevel}>
               <Text style={styles.trustText}>
@@ -442,8 +503,9 @@ export default function VerifyProof({ route, navigation }) {
             <View style={styles.loadingContainer}>
               <ActivityIndicator color="#ffffff" size="small" />
               <Text style={styles.verifyButtonText}>
-                {verificationPhase === 'offchain' ? 'Validating off-chain...' :
-                 verificationPhase === 'blockchain' ? 'Validating on blockchain...' :
+                {verificationPhase === 'offchain'  ? 'Validating cryptographic proof...' :
+                 verificationPhase === 'blockchain' ? 'Verifying on Sepolia...' :
+                 verificationPhase === 'registry'   ? 'Checking credential registry...' :
                  'Validating authenticity...'}
               </Text>
             </View>
@@ -466,7 +528,14 @@ export default function VerifyProof({ route, navigation }) {
               <Text style={styles.statusIcon}>
                 {verificationPhase === 'blockchain' ? '⏳' : verificationResults.blockchain ? '🔗✅' : '⚪'}
               </Text>
-              <Text style={styles.statusText}>Blockchain Verification</Text>
+              <Text style={styles.statusText}>Blockchain Verification (Sepolia)</Text>
+            </View>
+
+            <View style={styles.statusItem}>
+              <Text style={styles.statusIcon}>
+                {verificationPhase === 'registry' ? '⏳' : verificationResults.registry ? '📦✅' : '⚪'}
+              </Text>
+              <Text style={styles.statusText}>Credential Registry Lookup</Text>
             </View>
           </View>
         )}
@@ -1197,6 +1266,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontStyle: 'italic',
+  },
+  registryPanel: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 14,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+  },
+  registryMissingPanel: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 8,
+    padding: 14,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  revokedPanel: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    padding: 14,
+    marginVertical: 8,
+    borderWidth: 2,
+    borderColor: '#ef4444',
+  },
+  registryPanelTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  registryRow: {
+    fontSize: 12,
+    color: '#374151',
+    marginBottom: 4,
+  },
+  registryLabel: {
+    fontWeight: '600',
+    color: '#1e40af',
+  },
+  registryValue: {
+    color: '#374151',
+    fontFamily: 'monospace',
+  },
+  registryNote: {
+    fontSize: 11,
+    color: '#1e40af',
+    fontStyle: 'italic',
+    marginTop: 6,
+    lineHeight: 15,
+  },
+  registryMissingText: {
+    fontSize: 12,
+    color: '#9a3412',
+    lineHeight: 16,
+  },
+  revokedText: {
+    fontSize: 12,
+    color: '#dc2626',
+    lineHeight: 16,
+    fontWeight: '500',
   },
   verificationNotice: {
     backgroundColor: '#eff6ff',

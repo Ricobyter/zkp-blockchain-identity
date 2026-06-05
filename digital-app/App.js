@@ -154,7 +154,7 @@ export default function App() {
         <Stack.Screen
           name="AdminUpload"
           component={AdminUploadScreen}
-          options={{ ...adminHeaderStyle, title: 'Upload Excel' }}
+          options={{ ...adminHeaderStyle, title: 'Bulk Add Students' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
