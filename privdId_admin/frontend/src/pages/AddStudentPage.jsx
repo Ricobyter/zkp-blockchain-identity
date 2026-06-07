@@ -11,6 +11,7 @@ const initialFormState = {
   rollNo: "",
   programme: "",
   contactNo: "",
+  dob: "",
 };
 
 export default function AddStudentPage() {

@@ -30,6 +30,11 @@ const studentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    dob: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     hashedData: {
       type: String,
       required: true,

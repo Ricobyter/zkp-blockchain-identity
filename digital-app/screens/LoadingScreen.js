@@ -16,7 +16,6 @@ export default function LoadingScreen({ navigation, route }) {
   const steps = {
     generating: [
       'Preparing input data...',
-      'Computing Poseidon hashes...',
       'Generating zero-knowledge proof...',
     ],
     offchain: [
@@ -108,15 +107,12 @@ export default function LoadingScreen({ navigation, route }) {
   };
 
   const generateProof = async (form) => {
-    // Extract the numeric part from phone number (remove +91)
-    const phoneNumeric = form.phoneNo.replace(/^\+91/, '');
-    
     const preparedInput = {
-      name: poseidonHash(form.name).toString(),
-      rollNo: poseidonHash(form.rollNo).toString(),
-      dob: Number(form.dob),
-      phoneNo: Number(phoneNumeric),
-      branch: poseidonHash(form.branch).toString()
+      name: form.name,
+      rollNo: form.rollNo,
+      dob: form.dob,
+      phoneNo: form.phoneNo,
+      branch: form.branch
     };
 
     const response = await fetch(`${BACKEND_URL}/generate-proof`, {
@@ -219,12 +215,6 @@ export default function LoadingScreen({ navigation, route }) {
         return '';
     }
   };
-
-  // Poseidon hash function
-  function poseidonHash(str) {
-    const sha256 = require('js-sha256');
-    return BigInt('0x' + sha256(str));
-  }
 
   const progressWidth = progress.interpolate({
     inputRange: [0, 1],

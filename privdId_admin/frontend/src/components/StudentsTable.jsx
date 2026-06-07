@@ -1,6 +1,16 @@
 import { formatDate, truncate } from "../utils/format.js";
+import { Link } from "react-router-dom";
 
-export default function StudentsTable({ students, loading, onRefresh, selectedIds, onToggleSelect, onToggleSelectAll, onSendSelected }) {
+export default function StudentsTable({
+  students,
+  loading,
+  onRefresh,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onSendSelected,
+  onRevoke,
+}) {
   const allSelected = students.length > 0 && selectedIds.length === students.length;
   const someSelected = selectedIds.length > 0 && selectedIds.length < students.length;
 
@@ -69,10 +79,12 @@ export default function StudentsTable({ students, loading, onRefresh, selectedId
               <th className="px-4 py-2">Email</th>
               <th className="px-4 py-2">Roll No</th>
               <th className="px-4 py-2">Programme</th>
+              <th className="px-4 py-2">DOB</th>
               <th className="px-4 py-2">Contact</th>
               <th className="px-4 py-2">Email Status</th>
               <th className="px-4 py-2">Hash</th>
               <th className="px-4 py-2">Created</th>
+              <th className="px-4 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -90,14 +102,29 @@ export default function StudentsTable({ students, loading, onRefresh, selectedId
                 <td className="px-4 py-4">{student.email}</td>
                 <td className="px-4 py-4">{student.rollNo}</td>
                 <td className="px-4 py-4">{student.programme}</td>
+                <td className="px-4 py-4">{student.dob}</td>
                 <td className="px-4 py-4">{student.contactNo}</td>
                 <td className="px-4 py-4">
-                  <span className={student.emailSent ? "rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-medium text-emerald-200" : "rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200"}>
-                    {student.emailSent ? `Sent${student.emailSentAt ? ` • ${formatDate(student.emailSentAt)}` : ""}` : "Pending"}
+                  <span className={student.revoked ? "rounded-full bg-red-400/15 px-3 py-1 text-xs font-medium text-red-200" : student.emailSent ? "rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-medium text-emerald-200" : "rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200"}>
+                    {student.revoked ? "Revoked" : student.emailSent ? `Sent${student.emailSentAt ? ` • ${formatDate(student.emailSentAt)}` : ""}` : "Pending"}
                   </span>
                 </td>
                 <td className="px-4 py-4 font-mono text-xs text-zinc-300">{truncate(student.hashedData, 22)}</td>
-                <td className="rounded-r-2xl px-4 py-4 text-slate-400">{formatDate(student.createdAt)}</td>
+                <td className="px-4 py-4 text-slate-400">{formatDate(student.createdAt)}</td>
+                <td className="rounded-r-2xl px-4 py-4 text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <Link to={`/students/${student.id}/edit`} className="text-xs font-semibold text-blue-400 hover:text-blue-300">
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => onRevoke(student.id)}
+                      className="text-xs font-semibold text-red-400 hover:text-red-300 disabled:cursor-not-allowed disabled:text-zinc-500"
+                      disabled={student.revoked}
+                    >
+                      {student.revoked ? "Revoked" : "Revoke"}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

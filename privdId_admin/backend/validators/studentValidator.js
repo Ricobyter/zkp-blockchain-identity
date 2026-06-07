@@ -6,6 +6,7 @@ export const studentSchema = Joi.object({
   rollNo: Joi.string().trim().min(1).max(50).required(),
   programme: Joi.string().trim().min(2).max(120).required(),
   contactNo: Joi.string().trim().min(5).max(20).required(),
+  dob: Joi.string().trim().allow("").optional(),
 });
 
 export function validateStudentPayload(payload) {

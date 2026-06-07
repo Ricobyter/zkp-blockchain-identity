@@ -10,6 +10,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function stringToBigInt(value) {
+  const text = String(value ?? "");
+  if (!text.length) {
+    return 0n;
+  }
+  const hex = Buffer.from(text, "utf8").toString("hex");
+  return BigInt(`0x${hex}`);
+}
+
 const wasmPath = process.env.WASM_PATH || path.join(__dirname, 'identity.wasm');
 const zkeyPath = process.env.ZKEY_PATH || path.join(__dirname, 'identity_final.zkey');
 const vKeyPath = process.env.VKEY_PATH || path.join(__dirname, 'verification_key.json');
@@ -39,7 +48,14 @@ app.post('/generate-proof', async (req, res) => {
   console.log('Received input:', req.body);
   try {
     const { name, rollNo, dob, phoneNo, branch } = req.body;
-    const input = { name, rollNo, dob, phoneNo, branch };
+    
+    const input = {
+        name: stringToBigInt(name),
+        rollNo: stringToBigInt(rollNo),
+        dob: stringToBigInt(dob),
+        phoneNo: stringToBigInt(phoneNo),
+        branch: stringToBigInt(branch),
+    };
 
     // Generate proof and public signals using snarkjs
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,20 +13,40 @@ import {
 } from 'react-native';
 import { ADMIN_BACKEND_URL } from '../../environment';
 
-const EMPTY_FORM = {
-  name: '',
-  email: '',
-  rollNo: '',
-  programme: '',
-  contactNo: '',
-  dob: '',
-};
-
-export default function AdminAddStudentScreen({ route, navigation }) {
-  const { token } = route.params || {};
-  const [form, setForm] = useState(EMPTY_FORM);
+export default function AdminEditStudentScreen({ route, navigation }) {
+  const { studentId, token } = route.params || {};
+  const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    async function fetchStudent() {
+      setLoading(true);
+      try {
+        const response = await fetch(`${ADMIN_BACKEND_URL}/api/students/${studentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to fetch student');
+        
+        const student = data.student;
+        setForm({
+          name: student.name,
+          email: student.email,
+          rollNo: student.rollNo,
+          programme: student.programme,
+          contactNo: student.contactNo,
+          dob: student.dob || '',
+        });
+      } catch (error) {
+        Alert.alert('Error', error.message || 'Could not load student data.');
+        navigation.goBack();
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStudent();
+  }, [studentId, token]);
+  
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
@@ -51,16 +71,14 @@ export default function AdminAddStudentScreen({ route, navigation }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${ADMIN_BACKEND_URL}/api/students`, {
-        method: 'POST',
+      const response = await fetch(`${ADMIN_BACKEND_URL}/api/students/${studentId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          rollNo: form.rollNo.trim(),
           programme: form.programme.trim(),
           contactNo: form.contactNo.trim(),
           dob: form.dob.trim(),
@@ -70,27 +88,31 @@ export default function AdminAddStudentScreen({ route, navigation }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to create student');
+        throw new Error(data.message || 'Failed to update student');
       }
 
       Alert.alert(
-        'Student Created',
-        `${data.student?.name || 'Student'} added successfully. Send credentials from the dashboard.`,
+        'Student Updated',
+        `${data.student?.name || 'Student'} updated successfully.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-
-      setForm(EMPTY_FORM);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Could not create student');
+      Alert.alert('Error', error.message || 'Could not update student');
     } finally {
       setLoading(false);
     }
   };
+  
+  if (!form) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   const fields = [
     { key: 'name', label: 'Full Name', placeholder: 'e.g. Aarav Sharma', autoCapitalize: 'words', keyboardType: 'default' },
-    { key: 'email', label: 'Email Address', placeholder: 'student@college.edu', autoCapitalize: 'none', keyboardType: 'email-address' },
-    { key: 'rollNo', label: 'Roll Number', placeholder: 'e.g. 22BCSD01', autoCapitalize: 'characters', keyboardType: 'default' },
     { key: 'programme', label: 'Programme / Branch', placeholder: 'e.g. B.Tech CSE', autoCapitalize: 'words', keyboardType: 'default' },
     { key: 'contactNo', label: 'Contact Number', placeholder: '9876543210', autoCapitalize: 'none', keyboardType: 'phone-pad' },
     { key: 'dob', label: 'Date of Birth', placeholder: 'DDMMYYYY', autoCapitalize: 'none', keyboardType: 'number-pad' },
@@ -104,11 +126,20 @@ export default function AdminAddStudentScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
-            A temporary password will be generated automatically and stored. You can send credentials from the dashboard after adding the student.
+            Email and Roll Number cannot be changed. Updating other details will re-issue the on-chain credential.
           </Text>
         </View>
 
         <View style={styles.form}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Email Address</Text>
+            <TextInput style={[styles.input, styles.readOnlyInput]} value={form.email} editable={false} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Roll Number</Text>
+            <TextInput style={[styles.input, styles.readOnlyInput]} value={form.rollNo} editable={false} />
+          </View>
+
           {fields.map(({ key, label, placeholder, autoCapitalize, keyboardType }) => (
             <View key={key} style={styles.fieldGroup}>
               <Text style={styles.label}>{label}</Text>
@@ -134,7 +165,7 @@ export default function AdminAddStudentScreen({ route, navigation }) {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>Create Student</Text>
+            <Text style={styles.submitButtonText}>Update Student</Text>
           )}
         </TouchableOpacity>
 
@@ -199,22 +230,19 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     backgroundColor: '#f9fafb',
   },
+  readOnlyInput: {
+    backgroundColor: '#eef2f9',
+    color: '#64748b',
+  },
   submitButton: {
     backgroundColor: '#3b82f6',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   submitButtonDisabled: {
     backgroundColor: '#93c5fd',
-    shadowOpacity: 0,
-    elevation: 0,
   },
   submitButtonText: {
     color: '#ffffff',

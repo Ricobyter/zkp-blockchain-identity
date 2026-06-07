@@ -55,6 +55,18 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleRevoke(studentId) {
+    if (window.confirm("Are you sure you want to revoke this student's credential? This action is irreversible.")) {
+      try {
+        await api.delete(`/students/${studentId}`);
+        toast.success("Student credential revoked successfully.");
+        await loadStudents();
+      } catch (error) {
+        toast.error(getApiErrorMessage(error));
+      }
+    }
+  }
+
   useEffect(() => {
     void loadStudents();
   }, []);
@@ -88,6 +100,7 @@ export default function DashboardPage() {
         onToggleSelect={handleToggleSelect}
         onToggleSelectAll={handleToggleSelectAll}
         onSendSelected={handleSendSelected}
+        onRevoke={handleRevoke}
       />
 
       {emailSendDetails.length > 0 && (

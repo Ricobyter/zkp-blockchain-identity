@@ -5,6 +5,21 @@ import { generateTemporaryPassword } from "../utils/password.js";
 import { sendCredentialsEmail } from "./emailService.js";
 import { issueCredentialOnChain, revokeCredentialOnChain } from "./credentialService.js";
 
+function normalizePhone(contactNo) {
+  if (!contactNo) return "";
+  const digits = contactNo.replace(/\D/g, "");
+  if (digits.startsWith("91") && digits.length === 12) {
+    return `+91${digits.slice(2)}`;
+  }
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  if (!contactNo.startsWith("+")) {
+    return `+91${digits}`;
+  }
+  return contactNo;
+}
+
 export function normalizeStudentInput(studentPayload) {
   return {
     name: String(studentPayload.name ?? "").trim(),
@@ -12,6 +27,7 @@ export function normalizeStudentInput(studentPayload) {
     rollNo: String(studentPayload.rollNo ?? "").trim(),
     programme: String(studentPayload.programme ?? "").trim(),
     contactNo: String(studentPayload.contactNo ?? "").trim(),
+    dob: String(studentPayload.dob ?? "").trim(),
   };
 }
 
@@ -23,6 +39,7 @@ export function sanitizeStudent(student) {
     rollNo: student.rollNo,
     programme: student.programme,
     contactNo: student.contactNo,
+    dob: student.dob,
     hashedData: student.hashedData,
     emailSent: student.emailSent,
     emailSentAt: student.emailSentAt,
@@ -48,13 +65,16 @@ export async function findDuplicateStudent({ email, rollNo }) {
 
 export async function buildStudentRecord(studentPayload) {
   const normalizedStudent = normalizeStudentInput(studentPayload);
+  if (!normalizedStudent.dob) {
+    throw new AppError("Date of Birth is required to issue a credential.", 400);
+  }
   const temporaryPassword = generateTemporaryPassword();
   const hashedData = await hashPoseidonFields([
     normalizedStudent.name,
-    normalizedStudent.email,
     normalizedStudent.rollNo,
+    normalizedStudent.dob,
+    normalizePhone(normalizedStudent.contactNo),
     normalizedStudent.programme,
-    normalizedStudent.contactNo,
   ]);
 
   return {
@@ -72,6 +92,7 @@ export async function createStudent(studentPayload) {
     rollNo: record.rollNo,
     programme: record.programme,
     contactNo: record.contactNo,
+    dob: record.dob,
     hashedData: record.hashedData,
     password: record.password,
     emailSent: false,
@@ -147,18 +168,22 @@ export async function updateStudent(id, payload) {
   if (!student) throw new AppError("Student not found.", 404);
   if (student.revoked) throw new AppError("Cannot update a revoked credential.", 400);
 
-  const allowedFields = ["name", "programme", "contactNo"];
+  const allowedFields = ["name", "programme", "contactNo", "dob"];
   allowedFields.forEach((field) => {
     if (payload[field] !== undefined) student[field] = String(payload[field]).trim();
   });
 
+  if (!student.dob) {
+    throw new AppError("Date of Birth is required to issue a credential.", 400);
+  }
+
   // Recompute Poseidon hash with updated fields
   student.hashedData = await hashPoseidonFields([
     student.name,
-    student.email,
     student.rollNo,
+    student.dob,
+    normalizePhone(student.contactNo),
     student.programme,
-    student.contactNo,
   ]);
 
   await student.save();

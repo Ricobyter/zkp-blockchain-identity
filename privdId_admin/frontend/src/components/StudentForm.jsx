@@ -35,6 +35,13 @@ export default function StudentForm({ formData, onChange, onSubmit, loading, sub
         <input className="field-input" id="contactNo" name="contactNo" value={formData.contactNo} onChange={onChange} placeholder="9876543210" />
       </div>
 
+      <div>
+        <label className="field-label" htmlFor="dob">
+          Date of Birth
+        </label>
+        <input className="field-input" id="dob" name="dob" value={formData.dob} onChange={onChange} placeholder="DDMMYYYY" />
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <button className="primary-button" type="submit" disabled={loading}>
           {loading ? "Saving..." : submitLabel}

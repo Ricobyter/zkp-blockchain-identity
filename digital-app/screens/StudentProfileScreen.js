@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,9 +33,9 @@ function normalizePhone(contactNo) {
 
 export default function StudentProfileScreen({ route, navigation }) {
   const [student, setStudent] = useState(route.params.student);
+  const [dob, setDob] = useState(route.params.student.dob || '');
 
   // Refresh student data every time this screen comes into focus
-  // so updates and revocations made by admin are reflected immediately
   useFocusEffect(
     useCallback(() => {
       const refresh = async () => {
@@ -51,6 +51,9 @@ export default function StudentProfileScreen({ route, navigation }) {
               );
             } else {
               setStudent(data.student);
+              if (data.student.dob) {
+                setDob(data.student.dob);
+              }
             }
           }
         } catch {
@@ -61,7 +64,6 @@ export default function StudentProfileScreen({ route, navigation }) {
     }, [route.params.student.id])
   );
 
-  const [dob, setDob] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -96,7 +98,7 @@ export default function StudentProfileScreen({ route, navigation }) {
 
   const handleGenerateProof = () => {
     if (!dob || dob.length !== 8) {
-      Alert.alert('Date of Birth Required', 'Please select your date of birth to generate the proof.');
+      Alert.alert('Date of Birth Required', 'A valid Date of Birth is required to generate the proof.');
       return;
     }
 
@@ -106,15 +108,13 @@ export default function StudentProfileScreen({ route, navigation }) {
     const form = {
       name: student.name,
       rollNo: student.rollNo,
-      dob,                          // entered by user (DDMMYYYY)
-      phoneNo: normalizedPhone,     // contactNo → +91XXXXXXXXXX
-      branch: student.programme,    // programme → branch for ZK circuit
+      dob,
+      phoneNo: normalizedPhone,
+      branch: student.programme,
     };
 
-    // Pass selected fields so ShowProof knows initial privacy settings
     navigation.navigate('LoadingScreen', {
       form,
-      // Pre-configure privacy: if user didn't select a field, hide it in QR
       initialPrivacy: {
         name: selected.name,
         rollNo: selected.rollNo,
@@ -138,8 +138,6 @@ export default function StudentProfileScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-
-        {/* Welcome banner */}
         <View style={styles.welcomeBanner}>
           <Text style={styles.welcomeIcon}>🎓</Text>
           <Text style={styles.welcomeTitle}>Welcome, {student.name.split(' ')[0]}!</Text>
@@ -148,7 +146,6 @@ export default function StudentProfileScreen({ route, navigation }) {
           </Text>
         </View>
 
-        {/* Student details card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Your Identity Details</Text>
           <Text style={styles.cardSubtitle}>Tap fields to toggle what to share in the QR code.</Text>
@@ -169,20 +166,30 @@ export default function StudentProfileScreen({ route, navigation }) {
             </TouchableOpacity>
           ))}
 
-          {/* DOB — not from DB, user must enter */}
           <View style={styles.dobSection}>
             <Text style={styles.dobLabel}>Date of Birth *</Text>
-            <Text style={styles.dobNote}>Not stored in database — required for the ZK proof</Text>
-
-            <TouchableOpacity
-              style={[styles.dateButton, dob && styles.dateButtonFilled]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateButtonIcon}>📅</Text>
-              <Text style={[styles.dateButtonText, dob && styles.dateButtonTextFilled]}>
-                {formatDateDisplay(dob)}
-              </Text>
-            </TouchableOpacity>
+            {!student.dob ? (
+              <>
+                <Text style={styles.dobNote}>Please enter your DOB to enable proof generation.</Text>
+                <TouchableOpacity
+                  style={[styles.dateButton, dob && styles.dateButtonFilled]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateButtonIcon}>📅</Text>
+                  <Text style={[styles.dateButtonText, dob && styles.dateButtonTextFilled]}>
+                    {formatDateDisplay(dob)}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={[styles.fieldRow, styles.dobToggleRow]}>
+                 <Text style={styles.fieldIcon}>📅</Text>
+                 <View style={styles.fieldInfo}>
+                   <Text style={styles.fieldLabel}>Date of Birth</Text>
+                   <Text style={styles.fieldValue}>{formatDateDisplay(dob)}</Text>
+                 </View>
+              </View>
+            )}
 
             {showDatePicker && (
               <DateTimePicker
@@ -194,7 +201,6 @@ export default function StudentProfileScreen({ route, navigation }) {
               />
             )}
 
-            {/* DOB privacy toggle (only if date selected) */}
             {dob ? (
               <TouchableOpacity
                 style={[styles.fieldRow, styles.dobToggleRow, selected.dob && styles.fieldRowSelected]}
@@ -211,21 +217,18 @@ export default function StudentProfileScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Privacy note */}
         <View style={styles.privacyNote}>
           <Text style={styles.privacyNoteText}>
             🔒 Checked fields will be revealed in the QR code. Unchecked fields are hidden — the ZK proof still cryptographically validates your full identity.
           </Text>
         </View>
 
-        {/* Email info */}
         <View style={styles.emailInfo}>
           <Text style={styles.emailInfoText}>
             Logged in as: <Text style={styles.emailText}>{student.email}</Text>
           </Text>
         </View>
 
-        {/* Generate button */}
         <TouchableOpacity
           style={[styles.generateButton, !dob && styles.generateButtonDisabled]}
           onPress={handleGenerateProof}

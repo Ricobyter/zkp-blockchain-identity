@@ -17,6 +17,7 @@ import ManualQRInput from './screens/ManualQRInput';
 import AdminLoginScreen from './screens/admin/AdminLoginScreen';
 import AdminDashboardScreen from './screens/admin/AdminDashboardScreen';
 import AdminAddStudentScreen from './screens/admin/AdminAddStudentScreen';
+import AdminEditStudentScreen from './screens/admin/AdminEditStudentScreen';
 import AdminUploadScreen from './screens/admin/AdminUploadScreen';
 
 const Stack = createStackNavigator();
@@ -150,6 +151,11 @@ export default function App() {
           name="AdminAddStudent"
           component={AdminAddStudentScreen}
           options={{ ...adminHeaderStyle, title: 'Add Student' }}
+        />
+        <Stack.Screen
+          name="AdminEditStudent"
+          component={AdminEditStudentScreen}
+          options={{ ...adminHeaderStyle, title: 'Edit Student' }}
         />
         <Stack.Screen
           name="AdminUpload"

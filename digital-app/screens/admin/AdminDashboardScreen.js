@@ -69,6 +69,38 @@ export default function AdminDashboardScreen({ route, navigation }) {
       prev.length === students.length ? [] : students.map(s => s.id)
     );
   };
+  
+  const handleEdit = (studentId) => {
+    navigation.navigate('AdminEditStudent', { studentId, token });
+  };
+
+  const handleRevoke = async (studentId) => {
+    Alert.alert(
+      'Revoke Credential',
+      'Are you sure you want to revoke this credential? This is irreversible.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${ADMIN_BACKEND_URL}/api/students/${studentId}`, {
+                method: 'DELETE',
+                headers: authHeaders,
+              });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.message || 'Failed to revoke');
+              Alert.alert('Success', 'Credential has been revoked.');
+              loadStudents();
+            } catch (error) {
+              Alert.alert('Error', error.message || 'Could not revoke credential.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSendEmails = async () => {
     if (!selectedIds.length) {
@@ -122,28 +154,39 @@ export default function AdminDashboardScreen({ route, navigation }) {
   const renderStudent = ({ item }) => {
     const isSelected = selectedIds.includes(item.id);
     return (
-      <TouchableOpacity
-        style={[styles.studentRow, isSelected && styles.studentRowSelected]}
-        onPress={() => toggleSelect(item.id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.studentCheckbox}>
-          <Text style={styles.checkboxText}>{isSelected ? '✅' : '⬜'}</Text>
-        </View>
-        <View style={styles.studentInfo}>
-          <Text style={styles.studentName}>{item.name}</Text>
-          <Text style={styles.studentEmail}>{item.email}</Text>
+      <View style={[styles.studentRow, isSelected && styles.studentRowSelected]}>
+        <TouchableOpacity style={{flex:1}} onPress={() => toggleSelect(item.id)} activeOpacity={0.7}>
+          <View style={styles.studentTopRow}>
+            <View style={styles.studentCheckbox}>
+              <Text style={styles.checkboxText}>{isSelected ? '✅' : '⬜'}</Text>
+            </View>
+            <View style={styles.studentInfo}>
+              <Text style={styles.studentName}>{item.name}</Text>
+              <Text style={styles.studentEmail}>{item.email}</Text>
+            </View>
+          </View>
           <View style={styles.studentMeta}>
             <Text style={styles.metaTag}>{item.rollNo}</Text>
             <Text style={styles.metaTag}>{item.programme}</Text>
-            {item.emailSent ? (
+            <Text style={styles.metaTag}>DOB: {item.dob || 'N/A'}</Text>
+            {item.revoked ? (
+              <Text style={[styles.metaTag, styles.metaTagRevoked]}>🚫 Revoked</Text>
+            ) : item.emailSent ? (
               <Text style={[styles.metaTag, styles.metaTagSent]}>✉️ Sent</Text>
             ) : (
               <Text style={[styles.metaTag, styles.metaTagPending]}>📭 Pending</Text>
             )}
           </View>
+        </TouchableOpacity>
+        <View style={styles.studentActions}>
+          <TouchableOpacity onPress={() => handleEdit(item.id)} style={styles.actionButton}>
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleRevoke(item.id)} style={[styles.actionButton, styles.revokeButton]} disabled={item.revoked}>
+            <Text style={[styles.actionButtonText, styles.revokeButtonText]}>{item.revoked ? 'Revoked' : 'Revoke'}</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -392,8 +435,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   studentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 14,
@@ -404,6 +445,11 @@ const styles = StyleSheet.create({
   studentRowSelected: {
     borderColor: '#3b82f6',
     backgroundColor: '#eff6ff',
+  },
+  studentTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   studentCheckbox: {
     marginRight: 12,
@@ -423,12 +469,12 @@ const styles = StyleSheet.create({
   studentEmail: {
     fontSize: 12,
     color: '#64748b',
-    marginBottom: 6,
   },
   studentMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+    paddingLeft: 32,
   },
   metaTag: {
     fontSize: 11,
@@ -446,6 +492,36 @@ const styles = StyleSheet.create({
   metaTagPending: {
     backgroundColor: '#fef3c7',
     color: '#92400e',
+  },
+  metaTagRevoked: {
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+  },
+  studentActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  actionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#e0e7ff',
+  },
+  actionButtonText: {
+    color: '#4338ca',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  revokeButton: {
+    backgroundColor: '#ffe4e6',
+  },
+  revokeButtonText: {
+    color: '#be123c',
   },
   emptyState: {
     alignItems: 'center',
