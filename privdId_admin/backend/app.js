@@ -21,7 +21,7 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan("dev"));
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms'));
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", message: "Student service is healthy" });

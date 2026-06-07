@@ -10,6 +10,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Logging middleware for response time
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${req.method} ${req.originalUrl} ${res.statusCode} - ${duration} ms`);
+  });
+  next();
+});
+
 function stringToBigInt(value) {
   const text = String(value ?? "");
   if (!text.length) {
@@ -57,12 +67,14 @@ app.post('/generate-proof', async (req, res) => {
         branch: stringToBigInt(branch),
     };
 
+    console.time('ProofGeneration');
     // Generate proof and public signals using snarkjs
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
       input,
       wasmPath,
       zkeyPath
     );
+    console.timeEnd('ProofGeneration');
 
     res.json({ proof, publicSignals });
   } catch (err) {
@@ -74,7 +86,9 @@ app.post('/generate-proof', async (req, res) => {
 app.post('/verify', async (req, res) => {
   const { proof, publicSignals } = req.body;
   try {
+    console.time('OffChainVerification');
     const isValid = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+    console.timeEnd('OffChainVerification');
     res.json({ valid: isValid });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -100,8 +114,10 @@ app.post('/verify-onchain', async (req, res) => {
 
     const pC = [proof.pi_c[0], proof.pi_c[1]];
 
+    console.time('OnChainVerification');
     // Call the Solidity verifier contract's verifyProof method (read-only)
     const isValid = await verifierContract.verifyProof(pA, pB, pC, publicSignals);
+    console.timeEnd('OnChainVerification');
 
     res.json({ valid: isValid });
   } catch (err) {

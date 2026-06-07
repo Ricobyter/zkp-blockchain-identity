@@ -115,11 +115,15 @@ export default function LoadingScreen({ navigation, route }) {
       branch: form.branch
     };
 
+    const startTime = performance.now();
     const response = await fetch(`${BACKEND_URL}/generate-proof`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(preparedInput),
     });
+    const endTime = performance.now();
+    console.log(`Proof generation API call took ${((endTime - startTime) / 1000).toFixed(2)} s`);
+
 
     const text = await response.text();
     let data = JSON.parse(text);
